@@ -34,12 +34,17 @@ TfLiteStatus ConvPrepareHifi(TfLiteContext* context, TfLiteNode* node) {
   XtensaConvOpData* data = static_cast<XtensaConvOpData*>(node->user_data);
   const auto params = static_cast<const TfLiteConvParams*>(node->builtin_data);
 
+  MicroContext* micro_context = GetMicroContext(context);
+
   // Calculate scratch memory requirements and request scratch buffer
-  TfLiteTensor* output = GetOutput(context, node, kConvOutputTensor);
+  TfLiteTensor* output =
+      micro_context->AllocateTempOutputTensor(node, kConvOutputTensor);
   TF_LITE_ENSURE(context, output != nullptr);
-  const TfLiteTensor* input = GetInput(context, node, kConvInputTensor);
+  TfLiteTensor* input =
+      micro_context->AllocateTempInputTensor(node, kConvInputTensor);
   TF_LITE_ENSURE(context, input != nullptr);
-  const TfLiteTensor* filter = GetInput(context, node, kConvWeightsTensor);
+  TfLiteTensor* filter =
+      micro_context->AllocateTempInputTensor(node, kConvWeightsTensor);
   TF_LITE_ENSURE(context, filter != nullptr);
 
   const RuntimeShape& input_shape = GetTensorShape(input);
@@ -55,17 +60,18 @@ TfLiteStatus ConvPrepareHifi(TfLiteContext* context, TfLiteNode* node) {
   const int pad_height = data->reference_op_data.padding.height;
 
   int required_scratch = 0;
-  if( (params->dilation_height_factor > 1) || (params->dilation_width_factor > 1) ) {
-// HiFi4 uses an updated xa_nn_dilated_conv2d_std_getsize(). "output_channels" is passed as an extra parameter.
-// For HiFi5, with nnlib-hifi5 versions newer than 1.6.0, this condition can be removed.
-#if defined(HIFI4) || defined(HIFI5)
+  // Dilation is currently not supported for kTfLiteInt16 datatype.
+  if( ((params->dilation_height_factor > 1) || (params->dilation_width_factor > 1)) && input->type == kTfLiteInt8) {
+    // For HiFi5, with nnlib-hifi5 versions 1.7.0 onwards and for HiFi4 with nnlib-hifi4 versions 2.5.0 onwards, 
+    // we use the below dilated_conv2d_std getsize() API. For the earlier versions, "output_channels" argument is not needed.
+#if defined(HIFI5) || defined(HIFI4)
     required_scratch = xa_nn_dilated_conv2d_std_getsize(
         input_height, input_depth, filter_height, filter_width, stride_height,
         pad_height, output_height, output_channels, PREC_ASYM8S, params->dilation_height_factor);
-#endif
+#endif // defined(HIFI5) || defined(HIFI4)
     TF_LITE_ENSURE(context, required_scratch > 0);
-  } else
-  if ((params->dilation_width_factor == 1) &&
+  }
+  else if ((params->dilation_width_factor == 1) &&
       (params->dilation_height_factor == 1)) {
     if (input->type == kTfLiteInt8) {
       required_scratch = xa_nn_conv2d_std_getsize(
@@ -83,10 +89,13 @@ TfLiteStatus ConvPrepareHifi(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE_OK(
       context, context->RequestScratchBufferInArena(
                    context, required_scratch, &data->scratch_tensor_index));
+
+  micro_context->DeallocateTempTfLiteTensor(input);
+  micro_context->DeallocateTempTfLiteTensor(filter);
+  micro_context->DeallocateTempTfLiteTensor(output);
   return kTfLiteOk;
 }
 
-#if defined(HIFI4_INTERNAL)
 TfLiteStatus ConvEvalHifi16(TfLiteContext* context, TfLiteNode* node,
                             const TfLiteConvParams& params,
                             const XtensaConvOpData& data,
@@ -199,7 +208,6 @@ TfLiteStatus ConvEvalHifi16(TfLiteContext* context, TfLiteNode* node,
       tflite::micro::GetTensorData<int16_t>(output));
   return kTfLiteOk;
 }
-#endif  // defined (HIFI4_INTERNAL)
 
 TfLiteStatus ConvEvalHifi(TfLiteContext* context, TfLiteNode* node,
                           const TfLiteConvParams& params,
@@ -319,4 +327,4 @@ TfLiteStatus ConvEvalHifi(TfLiteContext* context, TfLiteNode* node,
 }
 
 }  // namespace tflite
-#endif  // defined(HIFI4) || defined (HIFI4_INTERNAL) || defined(HIFI5)
+#endif // defined(HIFI4) || defined (HIFI4_INTERNAL) || defined(HIFI5)

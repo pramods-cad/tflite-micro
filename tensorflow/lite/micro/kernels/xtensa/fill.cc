@@ -114,20 +114,19 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
   TfLiteEvalTensor* output = micro::GetEvalOutput(context, node, kOutputTensor);
 
   switch (value->type) {
-    case kTfLiteFloat32:
-#if HIFI_VFPU && (defined(HIFI4) || defined(HIFI5))
-    {
-	float  memsetValue = *(float *)micro::GetTensorData<float>(value);
-	int  numElem = micro::GetTensorShape(output).FlatSize();
-	float *dst = micro::GetTensorData<float>(output);
-	int err;
-	err = xa_nn_memset_f32_f32(dst,memsetValue, numElem);
-	TF_LITE_ENSURE(context, (err==0) );
-    }
+    case kTfLiteFloat32: {
+#if HIFI_VFPU
+      float  memsetValue = *(float *)micro::GetTensorData<float>(value);
+      int  numElem = micro::GetTensorShape(output).FlatSize();
+      float *dst = micro::GetTensorData<float>(output);
+      int err;
+      err = xa_nn_memset_f32_f32(dst,memsetValue, numElem);
+      TF_LITE_ENSURE(context, (err==0) );
 #else
       FillImpl<float>(value, output);
-#endif // HIFI_VFPU && (defined(HIFI4) || defined(HIFI5))
+#endif // HIFI_VFPU
       break;
+    }
     case kTfLiteInt32:
       FillImpl<int32_t>(value, output);
       break;
@@ -147,14 +146,7 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
 }  // namespace
 
 TfLiteRegistration Register_FILL() {
-  return {/*init=*/nullptr,
-          /*free=*/nullptr,
-          /*prepare=*/Prepare,
-          /*invoke=*/Eval,
-          /*profiling_string=*/nullptr,
-          /*builtin_code=*/0,
-          /*custom_name=*/nullptr,
-          /*version=*/0};
+  return tflite::micro::RegisterOp(nullptr, Prepare, Eval);
 }
 
 }  // namespace tflite

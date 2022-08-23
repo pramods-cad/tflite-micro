@@ -1,4 +1,4 @@
-/* Copyright 2019 The TensorFlow Authors. All Rights Reserved.
+/* Copyright 2021 The TensorFlow Authors. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -63,11 +63,11 @@ TfLiteStatus PackImpl(TfLiteContext* context, TfLiteNode* node,
       const T* input_ptr = input_data + copy_size * k;
       int loc = k * values_count * copy_size + i * copy_size;
       T* output_ptr = output_data + loc;
-#if defined(HIFI4) || defined(HIFI5)
+#if defined(HIFI5) || defined(HIFI4)
       memcpy(output_ptr, input_ptr, copy_size*sizeof(T));
 #else
       for (int j = 0; j < copy_size; ++j) output_ptr[j] = input_ptr[j];
-#endif // defined(HIFI4) || defined(HIFI5)
+#endif // defined(HIFI5) || defined(HIFI4)
     }
   }
 
@@ -112,14 +112,7 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
 }  // namespace pack
 
 TfLiteRegistration Register_PACK() {
-  return {/*init=*/nullptr,
-          /*free=*/nullptr,
-          /*prepare=*/nullptr,
-          /*invoke=*/pack::Eval,
-          /*profiling_string=*/nullptr,
-          /*builtin_code=*/0,
-          /*custom_name=*/nullptr,
-          /*version=*/0};
+  return tflite::micro::RegisterOp(nullptr, nullptr, pack::Eval);
 }
 
 }  // namespace micro

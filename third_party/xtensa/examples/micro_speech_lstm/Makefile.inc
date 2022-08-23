@@ -8,7 +8,8 @@
 # investigated independent of landing support for nullptr bias in fully_connected
 # for all the platforms.
 #
-ifeq ($(OPTIMIZED_KERNEL_DIR), xtensa)
+# Commenting the below check to enable model_run for cref/other targets.
+#ifeq ($(OPTIMIZED_KERNEL_DIR), xtensa)
    EXAMPLE_NAME:=micro_speech_lstm
    MICRO_SPEECH_LSTM_TEST_SRCS := \
    third_party/xtensa/examples/$(EXAMPLE_NAME)/$(EXAMPLE_NAME)_test.cc \
@@ -26,4 +27,4 @@ ifeq ($(OPTIMIZED_KERNEL_DIR), xtensa)
    ## Tests loading and running a speech model.
    $(eval $(call microlite_test,micro_speech_lstm_test,\
    $(MICRO_SPEECH_LSTM_TEST_SRCS),$(MICRO_SPEECH_LSTM_HDRS),$(MICRO_SPEECH_LSTM_GENERATOR_INPUTS)))
-endif
+#endif

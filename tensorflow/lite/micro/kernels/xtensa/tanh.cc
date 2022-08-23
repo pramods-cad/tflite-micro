@@ -24,8 +24,8 @@ limitations under the License.
 #include "tensorflow/lite/kernels/kernel_util.h"
 #include "tensorflow/lite/kernels/op_macros.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
-#include "tensorflow/lite/micro/micro_utils.h"
 #include "tensorflow/lite/micro/kernels/xtensa/xtensa.h"
+#include "tensorflow/lite/micro/micro_utils.h"
 
 namespace tflite {
 namespace ops {
@@ -177,7 +177,7 @@ TfLiteStatus TanhEval(TfLiteContext* context, TfLiteNode* node) {
       return kTfLiteOk;
     } break;
     case kTfLiteInt8: {
-#if defined(HIFI4) || defined(HIFI5)
+#if defined(HIFI5) || defined(HIFI4)
       int err;
       const int8_t *input_data_ptr;
       int8_t *output_data_ptr;
@@ -203,7 +203,7 @@ TfLiteStatus TanhEval(TfLiteContext* context, TfLiteNode* node) {
           tflite::micro::GetTensorData<int8_t>(input),
           tflite::micro::GetTensorShape(output),
           tflite::micro::GetTensorData<int8_t>(output));
-#endif // defined(HIFI4) || defined(HIFI5)
+#endif // defined(HIFI5) || defined(HIFI4)
       return kTfLiteOk;
     } break;
     default:
@@ -217,14 +217,8 @@ TfLiteStatus TanhEval(TfLiteContext* context, TfLiteNode* node) {
 }  // namespace activations
 
 TfLiteRegistration Register_TANH() {
-  return {/*init=*/activations::TanhInit,
-          /*free=*/nullptr,
-          /*prepare=*/activations::TanhPrepare,
-          /*invoke=*/activations::TanhEval,
-          /*profiling_string=*/nullptr,
-          /*builtin_code=*/0,
-          /*custom_name=*/nullptr,
-          /*version=*/0};
+  return tflite::micro::RegisterOp(
+      activations::TanhInit, activations::TanhPrepare, activations::TanhEval);
 }
 }  // namespace micro
 }  // namespace ops

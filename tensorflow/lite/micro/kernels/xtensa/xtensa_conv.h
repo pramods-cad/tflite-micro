@@ -28,6 +28,15 @@ struct XtensaConvOpData {
 #if defined(HIFI4) || defined(HIFI4_INTERNAL) || defined(HIFI5)
   int scratch_tensor_index;
 #endif  // defined(HIFI4) || defined (HIFI4_INTERNAL) || defined(HIFI5)
+
+#if defined(VISION_P6)
+  int8_t* reorder_coefficient_bias;  // buffers used to keep reordered coeff and
+                                     // biases.
+  uint32_t reorder_coefficient_bias_size;
+  int8_t* per_channel_output_shift_int8;
+  uint8_t* p_context;  // persistent lib context for this instance saved here
+  uint32_t context_size;
+#endif  // VISION_P6
 };
 
 #if defined(HIFI4) || defined(HIFI4_INTERNAL) || defined(HIFI5)
@@ -42,7 +51,7 @@ TfLiteStatus ConvEvalHifi(TfLiteContext* context, TfLiteNode* node,
                           TfLiteEvalTensor* output);
 #endif  // defined(HIFI4) || defined (HIFI4_INTERNAL) || defined(HIFI5)
 
-#if defined(HIFI4_INTERNAL)
+#if defined(HIFI4_INTERNAL) || defined(HIFI4) || defined(HIFI5)
 TfLiteStatus ConvEvalHifi16(TfLiteContext* context, TfLiteNode* node,
                             const TfLiteConvParams& params,
                             const XtensaConvOpData& data,
@@ -50,7 +59,21 @@ TfLiteStatus ConvEvalHifi16(TfLiteContext* context, TfLiteNode* node,
                             const TfLiteEvalTensor* filter,
                             const TfLiteEvalTensor* bias,
                             TfLiteEvalTensor* output);
-#endif  // defined (HIFI4_INTERNAL)
+#endif  // defined (HIFI4_INTERNAL) || defined(HIFI4) || defined(HIFI5)
+
+#if defined(VISION_P6)
+
+TfLiteStatus ConvPrepareVision(TfLiteContext* context, TfLiteNode* node);
+
+TfLiteStatus ConvEvalVision(TfLiteContext* context, TfLiteNode* node,
+                            const TfLiteConvParams& params,
+                            const XtensaConvOpData& data,
+                            const TfLiteEvalTensor* input,
+                            const TfLiteEvalTensor* filter,
+                            const TfLiteEvalTensor* bias,
+                            TfLiteEvalTensor* output);
+
+#endif  // VISION_P6
 
 TfLiteStatus ConvReferenceEvalInt8(TfLiteContext* context, TfLiteNode* node);
 

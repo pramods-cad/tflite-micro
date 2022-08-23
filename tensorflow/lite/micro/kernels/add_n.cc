@@ -121,11 +121,12 @@ TfLiteStatus CalculateOpData(TfLiteContext* context, TfLiteNode* node) {
         context, kTfLiteActNone, output, &data->output_activation_min,
         &data->output_activation_max));
   } else {
-    TF_LITE_KERNEL_LOG(context, "ADD_N only supports FLOAT32 and INT8, got %s.",
-                       TfLiteTypeGetName(output->type));
+    MicroPrintf("ADD_N only supports FLOAT32 and INT8, got %s.",
+                TfLiteTypeGetName(output->type));
     return kTfLiteError;
   }
 
+  micro_context->DeallocateTempTfLiteTensor(input_tensor_first);
   micro_context->DeallocateTempTfLiteTensor(output);
 
   return kTfLiteOk;
@@ -197,8 +198,8 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
   } else if (output->type == kTfLiteInt8) {
     EvalAddNQuantized<int8_t>(context, node, output);
   } else {
-    TF_LITE_KERNEL_LOG(context, "ADD_N only supports FLOAT32 and INT8, got %s.",
-                       TfLiteTypeGetName(output->type));
+    MicroPrintf("ADD_N only supports FLOAT32 and INT8, got %s.",
+                TfLiteTypeGetName(output->type));
     return kTfLiteError;
   }
   return kTfLiteOk;
@@ -207,14 +208,7 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
 }  // namespace
 
 TfLiteRegistration Register_ADD_N() {
-  return {/*init=*/nullptr,
-          /*free=*/nullptr,
-          /*prepare=*/Prepare,
-          /*invoke=*/Eval,
-          /*profiling_string=*/nullptr,
-          /*builtin_code=*/0,
-          /*custom_name=*/nullptr,
-          /*version=*/0};
+  return tflite::micro::RegisterOp(nullptr, Prepare, Eval);
 }
 
 }  // namespace tflite

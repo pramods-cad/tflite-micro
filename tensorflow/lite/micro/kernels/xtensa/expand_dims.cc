@@ -113,13 +113,13 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
 
 template <typename T>
 void memCopyN(T* out, const T* in, const int num_elements) {
-#if defined(HIFI4) || defined(HIFI5)
+#if defined(HIFI5) || defined(HIFI4)
   memcpy(out, in, num_elements * sizeof(T));
 #else
   for (int i = 0; i < num_elements; ++i) {
     out[i] = in[i];
   }
-#endif // defined(HIFI4) || defined(HIFI5)
+#endif // defined(HIFI5) || defined(HIFI4)
 }
 
 TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
@@ -150,14 +150,7 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
 }  // namespace
 
 TfLiteRegistration Register_EXPAND_DIMS() {
-  return {/*init=*/nullptr,
-          /*free=*/nullptr,
-          /*prepare=*/Prepare,
-          /*invoke=*/Eval,
-          /*profiling_string=*/nullptr,
-          /*builtin_code=*/0,
-          /*custom_name=*/nullptr,
-          /*version=*/0};
+  return tflite::micro::RegisterOp(nullptr, Prepare, Eval);
 }
 
 }  // namespace tflite

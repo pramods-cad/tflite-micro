@@ -1,4 +1,4 @@
-/* Copyright 2019 The TensorFlow Authors. All Rights Reserved.
+/* Copyright 2022 The TensorFlow Authors. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -504,6 +504,7 @@ void ValidateSVDFGoldens(const int batch_size, const int num_units,
 
   TfLiteStatus init_and_prepare_status = runner.InitAndPrepare();
   TF_LITE_MICRO_EXPECT_EQ(kTfLiteOk, init_and_prepare_status);
+  TF_LITE_MICRO_EXPECT(runner.ValidateTempBufferDeallocated());
 
   // Abort early to make it clear init and prepare failed.
   if (init_and_prepare_status != kTfLiteOk) {
@@ -531,6 +532,7 @@ void ValidateSVDFGoldens(const int batch_size, const int num_units,
       }
     }
   }
+  TF_LITE_MICRO_EXPECT(runner.ValidateTempBufferDeallocated());
 }
 
 #if !defined(XTENSA)  // Needed to avoid build errors from unused functions.
@@ -870,7 +872,7 @@ TF_LITE_MICRO_TEST(SvdfFloat2x2Input2x4OutputShouldMatchGolden) {
 #endif
 
 // Only reference kernels suport full int8 svdf currently.
-#if !(defined(XTENSA) || defined(CMSIS_NN) || defined(HEXAGON))
+#if !(defined(XTENSA) || defined(HEXAGON))
 TF_LITE_MICRO_TEST(SvdfQuantized2x2Input2x4OutputShouldMatchGoldenInt8) {
   tflite::testing::SvdfQuantized2x2Input2x4OutputShouldMatchGolden<int8_t>();
 }
@@ -947,7 +949,7 @@ TF_LITE_MICRO_TEST(SvdfFloat1x16Input64x1OutputReluShouldMatchGolden) {
 #endif
 
 // Only reference kernels suport full int8 svdf currently.
-#if !(defined(XTENSA) || defined(CMSIS_NN) || defined(HEXAGON))
+#if !(defined(XTENSA) || defined(HEXAGON))
 TF_LITE_MICRO_TEST(SvdfQuantized1x16Input64x1OutputShouldMatchGoldenInt8) {
   tflite::testing::SvdfQuantized1x16Input64x1OutputShouldMatchGolden<int8_t>();
 }
@@ -958,7 +960,7 @@ TF_LITE_MICRO_TEST(SvdfQuantized1x16Input64x1OutputShouldMatchGoldenInt16) {
 }
 
 // Only reference kernels suport full int8 svdf currently.
-#if !(defined(XTENSA) || defined(CMSIS_NN) || defined(HEXAGON))
+#if !(defined(XTENSA) || defined(HEXAGON))
 TF_LITE_MICRO_TEST(SvdfQuantized1x16Input64x1OutputReluShouldMatchGoldenInt8) {
   tflite::testing::SvdfQuantized1x16Input64x1OutputReluShouldMatchGolden<
       int8_t>();

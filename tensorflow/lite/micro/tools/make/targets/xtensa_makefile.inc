@@ -32,7 +32,14 @@ endif
 
 # Create a cflag based on the specified TARGET_ARCH. For example:
 #   TARGET_ARCH=hifi4 --> -DHIFI4
-TARGET_ARCH_DEFINES := -D$(shell echo $(TARGET_ARCH) | tr [a-z] [A-Z])
+#  For TARGET_ARCH=hifi3/3z or fusion_f1, cflag should be -DHIFI4.
+ifeq ($(TARGET_ARCH), $(filter $(TARGET_ARCH), hifi3 hifi3z fusion_f1))
+  TARGET_ARCH_DEFINES := -DHIFI4
+else
+  TARGET_ARCH_DEFINES := -D$(shell echo $(TARGET_ARCH) | tr [a-z] [A-Z])
+endif
+
+THIRD_PARTY_KERNEL_OPTIMIZATION_LEVEL := -O3 -LNO:simd
 
 THIRD_PARTY_KERNEL_OPTIMIZATION_LEVEL := -O3 -LNO:simd
 
@@ -45,10 +52,6 @@ PLATFORM_FLAGS = \
   -DMIN_RFFT_PWR=MAX_RFFT_PWR \
   $(TARGET_ARCH_DEFINES) \
   -mlongcalls
-
-ifeq ($(BUILD_TYPE), release)
-  PLATFORM_FLAGS += -Wno-unused-private-field
-endif
 
 export PATH := $(XTENSA_BASE)/tools/$(XTENSA_TOOLS_VERSION)/XtensaTools/bin:$(PATH)
 TARGET_TOOLCHAIN_PREFIX := xt-
@@ -94,15 +97,3 @@ EXCLUDED_EXAMPLE_TESTS := \
   tensorflow/lite/micro/examples/network_tester/Makefile.inc
 MICRO_LITE_EXAMPLE_TESTS := $(filter-out $(EXCLUDED_EXAMPLE_TESTS), $(MICRO_LITE_EXAMPLE_TESTS))
 MICRO_LITE_EXAMPLE_TESTS += $(shell find third_party/xtensa/examples/ -name Makefile.inc)
-
-# Needed for LSTM support.
-MICROLITE_CC_KERNEL_SRCS := $(MICROLITE_CC_KERNEL_SRCS) \
-tensorflow/lite/kernels/internal/reference/portable_tensor_utils.cc \
-tensorflow/lite/kernels/kernel_util.cc
-
-ifeq ($(OPTIMIZED_KERNEL_DIR), xtensa)
-  MICROLITE_CC_KERNEL_SRCS := $(MICROLITE_CC_KERNEL_SRCS) \
-  tensorflow/lite/micro/kernels/xtensa/lstm_eval.cc \
-  tensorflow/lite/micro/kernels/xtensa/lstm_eval_hifi.cc \
-  tensorflow/lite/micro/kernels/xtensa/unidirectional_sequence_lstm.cc
-endif

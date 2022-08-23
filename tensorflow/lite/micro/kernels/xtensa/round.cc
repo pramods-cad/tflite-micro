@@ -1,4 +1,4 @@
-/* Copyright 2018 The TensorFlow Authors. All Rights Reserved.
+/* Copyright 2021 The TensorFlow Authors. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ limitations under the License.
 #include "tensorflow/lite/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
+#include "tensorflow/lite/micro/kernels/xtensa/xtensa.h"
 
 namespace tflite {
 namespace ops {
@@ -58,7 +59,7 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
   TfLiteEvalTensor* output =
       tflite::micro::GetEvalOutput(context, node, kOutputTensor);
 
-#if HIFI_VFPU && (defined(HIFI4) || defined(HIFI5))
+#if HIFI_VFPU && (defined(HIFI5) || defined(HIFI4))
   const int flat_size = MatchingFlatSize(tflite::micro::GetTensorShape(input), tflite::micro::GetTensorShape(output));
   const float* in_data = tflite::micro::GetTensorData<float>(input);
   float* out_data = tflite::micro::GetTensorData<float>(output);
@@ -74,21 +75,13 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
                        tflite::micro::GetTensorData<float>(input),
                        tflite::micro::GetTensorShape(output),
                        tflite::micro::GetTensorData<float>(output));
-#endif // HIFI_VFPU && (defined(HIFI4) || defined(HIFI5))
-
+#endif // HIFI_VFPU && (defined(HIFI5) || defined(HIFI4))
   return kTfLiteOk;
 }
 }  // namespace round
 
 TfLiteRegistration Register_ROUND() {
-  return {/*init=*/nullptr,
-          /*free=*/nullptr,
-          /*prepare=*/round::Prepare,
-          /*invoke=*/round::Eval,
-          /*profiling_string=*/nullptr,
-          /*builtin_code=*/0,
-          /*custom_name=*/nullptr,
-          /*version=*/0};
+  return tflite::micro::RegisterOp(nullptr, round::Prepare, round::Eval);
 }
 
 }  // namespace micro

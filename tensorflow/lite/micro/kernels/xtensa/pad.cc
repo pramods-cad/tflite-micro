@@ -1,4 +1,4 @@
-/* Copyright 2019 The TensorFlow Authors. All Rights Reserved.
+/* Copyright 2022 The TensorFlow Authors. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,30 +24,37 @@ limitations under the License.
 #include "tensorflow/lite/kernels/op_macros.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/kernels/xtensa/xtensa.h"
+#include "tensorflow/lite/micro/kernels/xtensa/xtensa_pad.h"
 
 namespace tflite {
 namespace ops {
 namespace micro {
 namespace pad {
-namespace {
-
-struct OpData {
-  PadParams params;
-  int32_t output_zero_point;
-};
-
-}  // namespace
 
 void* Init(TfLiteContext* context, const char* buffer, size_t length) {
   TFLITE_DCHECK(context->AllocatePersistentBuffer != nullptr);
-  return context->AllocatePersistentBuffer(context, sizeof(OpData));
+#if !defined(VISION_P6)
+  return context->AllocatePersistentBuffer(context, sizeof(OpDataPad));
+#else
+  void* data =
+      context->AllocatePersistentBuffer(context, sizeof(XtensaPadData));
+  if (InitXtensaContext()) {
+    return nullptr;
+  }
+  return data;
+#endif  // defined(VISION_P6)
 }
 
 TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   MicroContext* micro_context = GetMicroContext(context);
 
   TFLITE_DCHECK(node->user_data != nullptr);
-  OpData* data = static_cast<OpData*>(node->user_data);
+#if defined(VISION_P6)
+  XtensaPadData* op_data_xtensa = static_cast<XtensaPadData*>(node->user_data);
+  OpDataPad* data = &op_data_xtensa->reference_op_data;
+#else
+  OpDataPad* data = static_cast<OpDataPad*>(node->user_data);
+#endif
 
   TF_LITE_ENSURE(context, NumInputs(node) == 2 || NumInputs(node) == 3);
   TF_LITE_ENSURE_EQ(context, NumOutputs(node), 1);
@@ -94,7 +101,7 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
     TF_LITE_ENSURE_EQ(context, output_dim, expected_dim);
   }
 
-  // Calculate OpData:
+  // Calculate OpDataPad:
   data->params.resizing_category = ResizingCategory::kGenericResize;
   const int paddings_total = GetTensorShape(paddings).FlatSize();
   if (paddings_total == 8 && (paddings_data[0] == 0 && paddings_data[1] == 0) &&
@@ -136,13 +143,21 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
     micro_context->DeallocateTempTfLiteTensor(constant_values);
   }
   micro_context->DeallocateTempTfLiteTensor(output);
+#if defined(VISION_P6)
+  TF_LITE_ENSURE_OK(context, PadPrepareVision(context, node));
+#endif  // VISION_P6
 
   return kTfLiteOk;
 }
 
 TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
   TFLITE_DCHECK(node->user_data != nullptr);
-  const OpData* data = static_cast<const OpData*>(node->user_data);
+#if defined(VISION_P6)
+  XtensaPadData* op_data_xtensa = static_cast<XtensaPadData*>(node->user_data);
+  OpDataPad* data = &op_data_xtensa->reference_op_data;
+#else
+  OpDataPad* data = static_cast<OpDataPad*>(node->user_data);
+#endif
 
   const TfLiteEvalTensor* input =
       tflite::micro::GetEvalInput(context, node, /*index=*/0);
@@ -173,6 +188,9 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
       }
     } break;
     case kTfLiteInt8: {
+#if defined(VISION_P6)
+      PadEvalVision(*op_data_xtensa, input, output);
+#else
       int8_t pad_value;
       if (constant_values == nullptr) {
         pad_value = static_cast<uint8_t>(data->output_zero_point);
@@ -233,16 +251,39 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
                            tflite::micro::GetTensorData<int8_t>(output));
       }
 #endif // defined(HIFI4) || defined(HIFI5)
+#endif
     } break;
     case kTfLiteInt16: {
       int16_t pad_value =
           constant_values == nullptr
               ? 0
               : *tflite::micro::GetTensorData<int16_t>(constant_values);
-      reference_ops::Pad(data->params, tflite::micro::GetTensorShape(input),
-                         tflite::micro::GetTensorData<int16_t>(input),
-                         &pad_value, tflite::micro::GetTensorShape(output),
-                         tflite::micro::GetTensorData<int16_t>(output));
+#if defined(HIFI4_INTERNAL) || defined(HIFI4) || defined(HIFI5)
+      /* NNLib currently only supports upto 4D input tensors */
+      if (tflite::micro::GetTensorShape(input).DimensionsCount() == 4) {
+        const TfLiteEvalTensor* paddings =
+            tflite::micro::GetEvalInput(context, node, /*index=*/1);
+        int32_t err = xa_nn_pad_16_16(
+            tflite::micro::GetTensorData<int16_t>(output),
+            tflite::micro::GetTensorShape(output).DimsData(),
+            tflite::micro::GetTensorData<int16_t>(input),
+            tflite::micro::GetTensorShape(input).DimsData(),
+            tflite::micro::GetTensorData<int32_t>(paddings),
+            tflite::micro::GetTensorShape(paddings).DimsData(),
+            tflite::micro::GetTensorShape(output).DimensionsCount(),
+            tflite::micro::GetTensorShape(input).DimensionsCount(),
+            tflite::micro::GetTensorShape(paddings).DimensionsCount(),
+            pad_value);
+        if (err != 0) return kTfLiteError;
+      } else {
+#endif  // HIFI4_INTERNAL || defined(HIFI4) || defined(HIFI5)
+        reference_ops::Pad(data->params, tflite::micro::GetTensorShape(input),
+                           tflite::micro::GetTensorData<int16_t>(input),
+                           &pad_value, tflite::micro::GetTensorShape(output),
+                           tflite::micro::GetTensorData<int16_t>(output));
+#if defined(HIFI4_INTERNAL) || defined(HIFI4) || defined(HIFI5)
+      }
+#endif  // HIFI4_INTERNAL || defined(HIFI4) || defined(HIFI5)
     } break;
     case kTfLiteInt32: {
       int32_t pad_value =
@@ -256,8 +297,8 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
     } break;
     default:
 
-      TF_LITE_KERNEL_LOG(context, "Type %s not currently supported by Pad.",
-                         TfLiteTypeGetName(input->type));
+      MicroPrintf("Type %s not currently supported by Pad.",
+                  TfLiteTypeGetName(input->type));
       return kTfLiteError;
   }
   return kTfLiteOk;
@@ -266,26 +307,12 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
 }  // namespace pad
 
 TfLiteRegistration Register_PAD() {
-  return {/*init=*/pad::Init,
-          /*free=*/nullptr,
-          /*prepare=*/pad::Prepare,
-          /*invoke=*/pad::Eval,
-          /*profiling_string=*/nullptr,
-          /*builtin_code=*/0,
-          /*custom_name=*/nullptr,
-          /*version=*/0};
+  return tflite::micro::RegisterOp(pad::Init, pad::Prepare, pad::Eval);
 }
 
 // Also register Pad as PadV2.
 TfLiteRegistration Register_PADV2() {
-  return {/*init=*/pad::Init,
-          /*free=*/nullptr,
-          /*prepare=*/pad::Prepare,
-          /*invoke=*/pad::Eval,
-          /*profiling_string=*/nullptr,
-          /*builtin_code=*/0,
-          /*custom_name=*/nullptr,
-          /*version=*/0};
+  return tflite::micro::RegisterOp(pad::Init, pad::Prepare, pad::Eval);
 }
 
 }  // namespace micro

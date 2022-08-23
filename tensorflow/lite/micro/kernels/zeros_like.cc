@@ -37,6 +37,8 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE(context, output != nullptr);
   output->type = input->type;
 
+  micro_context->DeallocateTempTfLiteTensor(input);
+  micro_context->DeallocateTempTfLiteTensor(output);
   return kTfLiteOk;
 }
 
@@ -68,10 +70,10 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
       resetZeros(tflite::micro::GetTensorData<float>(output), flat_size);
       break;
     default:
-      TF_LITE_KERNEL_LOG(context,
-                         "ZerosLike only currently supports int64, int32, "
-                         "and float32, got %d.",
-                         input->type);
+      MicroPrintf(
+          "ZerosLike only currently supports int64, int32, "
+          "and float32, got %d.",
+          input->type);
       return kTfLiteError;
   }
   return kTfLiteOk;
@@ -79,14 +81,7 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
 }  // namespace
 
 TfLiteRegistration Register_ZEROS_LIKE() {
-  return {/*init=*/nullptr,
-          /*free=*/nullptr,
-          /*prepare=*/Prepare,
-          /*invoke=*/Eval,
-          /*profiling_string=*/nullptr,
-          /*builtin_code=*/0,
-          /*custom_name=*/nullptr,
-          /*version=*/0};
+  return tflite::micro::RegisterOp(nullptr, Prepare, Eval);
 }
 
 }  // namespace tflite

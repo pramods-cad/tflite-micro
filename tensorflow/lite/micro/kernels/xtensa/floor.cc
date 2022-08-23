@@ -34,7 +34,7 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE_TYPES_EQ(context, input->type, kTfLiteFloat32);
   TfLiteEvalTensor* output =
       tflite::micro::GetEvalOutput(context, node, kOutputTensor);
-#if HIFI_VFPU && (defined(HIFI4) || defined(HIFI5))
+#if HIFI_VFPU
   int err;
   const float* inp_data_ptr;
   float* out_data_ptr;
@@ -53,20 +53,13 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
                        tflite::micro::GetTensorData<float>(input),
                        tflite::micro::GetTensorShape(output),
                        tflite::micro::GetTensorData<float>(output));
-#endif // HIFI_VFPU && (defined(HIFI4) || defined(HIFI5))
+#endif // HIFI_VFPU
   return kTfLiteOk;
 }
 }  // namespace floor
 
 TfLiteRegistration Register_FLOOR() {
-  return {/*init=*/nullptr,
-          /*free=*/nullptr,
-          /*prepare=*/nullptr,
-          /*invoke=*/floor::Eval,
-          /*profiling_string=*/nullptr,
-          /*builtin_code=*/0,
-          /*custom_name=*/nullptr,
-          /*version=*/0};
+  return tflite::micro::RegisterOp(nullptr, nullptr, floor::Eval);
 }
 
 }  // namespace micro

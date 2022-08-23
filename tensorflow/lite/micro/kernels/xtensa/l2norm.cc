@@ -122,7 +122,7 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
         MatchingDim(input_shape, trailing_dim, output_shape, trailing_dim);
     const int outer_size =
         MatchingFlatSizeSkipDim(input_shape, trailing_dim, output_shape);
-#if defined(HIFI4) || defined(HIFI5)
+#if defined(HIFI5) || defined(HIFI4)
     int err, itr = 0;
     const int8_t *input_data_ptr;
     int8_t *output_data_ptr;
@@ -142,7 +142,7 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
         data.input_zero_point, outer_size, depth,
         tflite::micro::GetTensorData<int8_t>(input),
         tflite::micro::GetTensorData<int8_t>(output));
-#endif // defined(HIFI4) || defined(HIFI5)
+#endif // defined(HIFI5) || defined(HIFI4)
   } else {
     TF_LITE_KERNEL_LOG(context, "Output type is %s, requires float.",
                        TfLiteTypeGetName(output->type));
@@ -155,14 +155,7 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
 }  // namespace l2norm
 
 TfLiteRegistration Register_L2NORM_REF() {
-  return {/*init=*/l2norm::Init,
-          /*free=*/nullptr,
-          /*prepare=*/l2norm::Prepare,
-          /*invoke=*/l2norm::Eval,
-          /*profiling_string=*/nullptr,
-          /*builtin_code=*/0,
-          /*custom_name=*/nullptr,
-          /*version=*/0};
+  return tflite::micro::RegisterOp(l2norm::Init, l2norm::Prepare, l2norm::Eval);
 }
 
 TfLiteRegistration Register_L2_NORMALIZATION() { return Register_L2NORM_REF(); }

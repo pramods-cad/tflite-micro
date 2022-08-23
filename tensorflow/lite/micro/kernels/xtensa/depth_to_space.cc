@@ -118,7 +118,7 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
                                   tflite::micro::GetTensorData<float>(output));
       break;
     case kTfLiteInt8:
-#if defined(HIFI4) || defined(HIFI5)
+#if defined(HIFI5) || defined(HIFI4)
       {
         const RuntimeShape& input_shape = tflite::micro::GetTensorShape(input);
         const RuntimeShape& output_shape = tflite::micro::GetTensorShape(output);
@@ -154,7 +154,7 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
                                   tflite::micro::GetTensorData<int8_t>(input),
                                   tflite::micro::GetTensorShape(output),
                                   tflite::micro::GetTensorData<int8_t>(output));
-#endif // defined(HIFI4) || defined(HIFI5)
+#endif // defined(HIFI5) || defined(HIFI4)
       break;
     default:
       TF_LITE_KERNEL_LOG(
@@ -169,14 +169,7 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
 }  // namespace
 
 TfLiteRegistration Register_DEPTH_TO_SPACE() {
-  return {/*init=*/nullptr,
-          /*free=*/nullptr,
-          /*prepare=*/Prepare,
-          /*invoke=*/Eval,
-          /*profiling_string=*/nullptr,
-          /*builtin_code=*/0,
-          /*custom_name=*/nullptr,
-          /*version=*/0};
+  return tflite::micro::RegisterOp(nullptr, Prepare, Eval);
 }
 
 }  // namespace tflite

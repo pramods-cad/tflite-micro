@@ -88,19 +88,19 @@ TfLiteStatus CircularBufferEval(TfLiteContext* context, TfLiteNode* node) {
   int depth = output->dims->data[2] * output->dims->data[3];
 
   if (input->type == kTfLiteInt8) {
-#if defined(HIFI4) || defined(HIFI5)
-  const int8_t* xa_input;
-  int8_t* xa_output;
-  int err;
-  xa_input = tflite::micro::GetTensorData<int8_t>(input);
-  xa_output =tflite::micro::GetTensorData<int8_t>(output);
-  err = xa_nn_memmove_8_8(xa_output, &xa_output[depth], (num_slots-1)*depth);
-  TF_LITE_ENSURE(context, (err==0) );
-  memcpy(&xa_output[(num_slots - 1) * depth], xa_input, depth);
+#if defined(HIFI5) || defined(HIFI4)
+    const int8_t* xa_input;
+    int8_t* xa_output;
+    int err;
+    xa_input = tflite::micro::GetTensorData<int8_t>(input);
+    xa_output =tflite::micro::GetTensorData<int8_t>(output);
+    err = xa_nn_memmove_8_8(xa_output, &xa_output[depth], (num_slots-1)*depth);
+    TF_LITE_ENSURE(context, (err==0) );
+    memcpy(&xa_output[(num_slots - 1) * depth], xa_input, depth);
 #else
     EvalInt8(tflite::micro::GetTensorData<int8_t>(input), num_slots, depth,
              tflite::micro::GetTensorData<int8_t>(output));
-#endif // defined(HIFI4) || defined(HIFI5)
+#endif // defined(HIFI5) || defined(HIFI4)
   } else {
     TF_LITE_KERNEL_LOG(context, "Type %s (%d) not supported.",
                        TfLiteTypeGetName(input->type), input->type);
@@ -120,14 +120,7 @@ TfLiteStatus CircularBufferEval(TfLiteContext* context, TfLiteNode* node) {
 }
 
 TfLiteRegistration* Register_CIRCULAR_BUFFER() {
-  static TfLiteRegistration r = {/*init=*/CircularBufferInit,
-                                 /*free=*/nullptr,
-                                 /*prepare=*/CircularBufferPrepare,
-                                 /*invoke=*/CircularBufferEval,
-                                 /*profiling_string=*/nullptr,
-                                 /*builtin_code=*/0,
-                                 /*custom_name=*/nullptr,
-                                 /*version=*/0};
+  static TfLiteRegistration r = tflite::micro::RegisterOp(CircularBufferInit, CircularBufferPrepare, CircularBufferEval);
   return &r;
 }
 

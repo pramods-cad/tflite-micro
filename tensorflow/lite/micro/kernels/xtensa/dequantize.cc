@@ -44,8 +44,8 @@ TfLiteStatus DequantizeEval(TfLiteContext* context, TfLiteNode* node) {
 
   if (output->type == kTfLiteFloat32) {
     switch (input->type) {
-      case kTfLiteInt8: {
-#if HAVE_VFPU && (defined(HIFI4) || defined(HIFI5))
+      case kTfLiteInt8:
+#if HAVE_VFPU && (defined(HIFI5) || defined(HIFI4))
         int err;
         const int8_t *input_data_ptr;
         float *output_data_ptr;
@@ -65,12 +65,19 @@ TfLiteStatus DequantizeEval(TfLiteContext* context, TfLiteNode* node) {
                                   tflite::micro::GetTensorData<int8_t>(input),
                                   tflite::micro::GetTensorShape(output),
                                   tflite::micro::GetTensorData<float>(output));
-#endif // HAVE_VFPU && (defined(HIFI4) || defined(HIFI5))
-        }break;
+#endif // HAVE_VFPU && (defined(HIFI5) || defined(HIFI4))
+        break;
       case kTfLiteInt16:
         reference_ops::Dequantize(data->quantization_params,
                                   tflite::micro::GetTensorShape(input),
                                   tflite::micro::GetTensorData<int16_t>(input),
+                                  tflite::micro::GetTensorShape(output),
+                                  tflite::micro::GetTensorData<float>(output));
+        break;
+      case kTfLiteUInt8:
+        reference_ops::Dequantize(data->quantization_params,
+                                  tflite::micro::GetTensorShape(input),
+                                  tflite::micro::GetTensorData<uint8_t>(input),
                                   tflite::micro::GetTensorShape(output),
                                   tflite::micro::GetTensorData<float>(output));
         break;
@@ -91,14 +98,8 @@ TfLiteStatus DequantizeEval(TfLiteContext* context, TfLiteNode* node) {
 }
 
 TfLiteRegistration Register_DEQUANTIZE() {
-  return {/*init=*/DequantizeInit,
-          /*free=*/nullptr,
-          /*prepare=*/DequantizePrepare,
-          /*invoke=*/DequantizeEval,
-          /*profiling_string=*/nullptr,
-          /*builtin_code=*/0,
-          /*custom_name=*/nullptr,
-          /*version=*/0};
+  return tflite::micro::RegisterOp(DequantizeInit, DequantizePrepare,
+                                   DequantizeEval);
 }
 
 }  // namespace tflite

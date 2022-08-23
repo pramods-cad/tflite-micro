@@ -19,32 +19,33 @@ limitations under the License.
 #include <xtensa/tie/xt_hifi2.h>
 
 namespace tflite {
-namespace ops {
-namespace micro {
-namespace lstm_eval {
 
 #if defined(HIFI5)
 #if TFLITE_SINGLE_ROUNDING
 #define MPY_BY_QUANT_MULT_X2_OUT32(out, inp, multiplier, left_shift, right_shift) \
 { \
   ae_int64 out64_0, out64_1; \
+  ae_int64 INT64_ONE = AE_MOVINT64_FROMINT32X2(AE_MOVDA32X2(0,1)); \
+  ae_int64 round_val = AE_SLAA64S(INT64_ONE, 30 - left_shift); \
   AE_MUL32X2S_HH_LL(out64_0, out64_1, inp, AE_MOVDA32(multiplier)); \
-  out64_0 = AE_SLAA64S(out64_0, 1 + left_shift); \
-  out64_1 = AE_SLAA64S(out64_1, 1 + left_shift); \
-  out = AE_ROUND32X2F64SASYM(out64_0, out64_1); \
+  out64_0 = AE_ADD64S(out64_0, round_val); \
+  out64_1 = AE_ADD64S(out64_1, round_val); \
+  out = AE_TRUNCA32X2F64S(out64_0, out64_1, 1 + left_shift); \
 }
 
 #define MPY_BY_QUANT_MULT_X2X2_OUT32(out1, out2, inp1, inp2, multiplier, left_shift, right_shift) \
 { \
   ae_int64 out64_0, out64_1, out64_2, out64_3; \
+  ae_int64 INT64_ONE = AE_MOVINT64_FROMINT32X2(AE_MOVDA32X2(0,1)); \
+  ae_int64 round_val = AE_SLAA64S(INT64_ONE, 30 - left_shift); \
   AE_MUL32X2S_HH_LL(out64_0, out64_1, inp1, AE_MOVDA32(multiplier)); \
   AE_MUL32X2S_HH_LL(out64_2, out64_3, inp2, AE_MOVDA32(multiplier)); \
-  out64_0 = AE_SLAA64S(out64_0, 1 + left_shift); \
-  out64_1 = AE_SLAA64S(out64_1, 1 + left_shift); \
-  out64_2 = AE_SLAA64S(out64_2, 1 + left_shift); \
-  out64_3 = AE_SLAA64S(out64_3, 1 + left_shift); \
-  out1 = AE_ROUND32X2F64SASYM(out64_0, out64_1); \
-  out2 = AE_ROUND32X2F64SASYM(out64_2, out64_3); \
+  out64_0 = AE_ADD64S(out64_0, round_val); \
+  out64_1 = AE_ADD64S(out64_1, round_val); \
+  out64_2 = AE_ADD64S(out64_2, round_val); \
+  out64_3 = AE_ADD64S(out64_3, round_val); \
+  out1 = AE_TRUNCA32X2F64S(out64_0, out64_1, 1 + left_shift); \
+  out2 = AE_TRUNCA32X2F64S(out64_2, out64_3, 1 + left_shift); \
 }
 #else /* #if TFLITE_SINGLE_ROUNDING */
 #define MPY_BY_QUANT_MULT_X2_OUT32(out, inp, multiplier, left_shift, right_shift) \
@@ -533,6 +534,7 @@ void xa_nn_elm_mul_16x16_asym8s(int8_t* output, const int16_t* input_1,
 }
 #endif /* #if TFLITE_SINGLE_ROUNDING */
 
+#ifndef AE_MULFP16X4RS
 static inline ae_f16x4 AE_MULFP16X4RS(ae_f16x4 d0, ae_f16x4 d1){
 	ae_f16x4 output;
 	ae_f32x2 d0_32_0, d0_32_1,  out32_0, out32_1;
@@ -543,15 +545,20 @@ static inline ae_f16x4 AE_MULFP16X4RS(ae_f16x4 d0, ae_f16x4 d1){
 	output = AE_SEL16_6420(AE_MOVF16X4_FROMF32X2(out32_0),  AE_MOVF16X4_FROMF32X2(out32_1));
 	return output;
 }
+#endif
 
+#ifndef AE_MINMAX16
 #define AE_MINMAX16(dinout, d_min, d_max){\
 	xtbool4 b0 = AE_LT16(dinout, d_min);\
 	AE_MOVT16X4(dinout, d_min, b0);\
 	b0 = AE_LT16(d_max, dinout);\
 	AE_MOVT16X4(dinout, d_max, b0);\
 }
+#endif
 
+#ifndef AE_SRAA32SYMS
 #define AE_SRAA32SYMS(inp, right_shift)  AE_ROUND32X2F64SSYM(AE_SRAA64(AE_CVT64F32_H(inp), right_shift), AE_SRAA64(AE_CVT64F32_L(inp), right_shift))
+#endif
 
 void calc_cell_state_without_cifg(int16_t* cell_state,
                                   const int16_t* forget_gate,
@@ -994,7 +1001,4 @@ void xa_nn_elm_mul_16x16_asym8s(int8_t* output, const int16_t* input_1,
 }
 #endif  // defined(HIFI5)
 
-}  // namespace lstm_eval
-}  // namespace micro
-}  // namespace ops
 }  // namespace tflite

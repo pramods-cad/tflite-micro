@@ -51,8 +51,8 @@ TfLiteStatus HardSwishEval(TfLiteContext* context, TfLiteNode* node) {
           tflite::micro::GetTensorShape(output),
           tflite::micro::GetTensorData<float>(output));
     } break;
-#if defined(HIFI4) || defined(HIFI5)
     case kTfLiteInt8: {
+#if defined(HIFI5) || defined(HIFI4)
       int err = 0;
       const int flat_size = MatchingFlatSize(tflite::micro::GetTensorShape(input), tflite::micro::GetTensorShape(output));
       err = xa_nn_vec_hard_swish_asym8s_asym8s(
@@ -67,16 +67,14 @@ TfLiteStatus HardSwishEval(TfLiteContext* context, TfLiteNode* node) {
           flat_size);
 
       TF_LITE_ENSURE(context, err == 0);
-    } break;
 #else
-    case kTfLiteInt8: {
       tflite::reference_ops::HardSwish<int8_t>(
           *params, tflite::micro::GetTensorShape(input),
           tflite::micro::GetTensorData<int8_t>(input),
           tflite::micro::GetTensorShape(output),
           tflite::micro::GetTensorData<int8_t>(output));
+#endif // defined(HIFI5) || defined(HIFI4)
     } break;
-#endif // defined(HIFI4) || defined(HIFI5)
     default: {
       MicroPrintf("Unsupported type %s", TfLiteTypeGetName(input->type));
       return kTfLiteError;
@@ -88,14 +86,8 @@ TfLiteStatus HardSwishEval(TfLiteContext* context, TfLiteNode* node) {
 }  // namespace
 
 TfLiteRegistration Register_HARD_SWISH() {
-  return {/*init=*/HardSwishInit,
-          /*free=*/nullptr,
-          /*prepare=*/tflite::HardSwishPrepare,
-          /*invoke=*/HardSwishEval,
-          /*profiling_string=*/nullptr,
-          /*builtin_code=*/0,
-          /*custom_name=*/nullptr,
-          /*version=*/0};
+  return tflite::micro::RegisterOp(HardSwishInit, tflite::HardSwishPrepare,
+                                   HardSwishEval);
 }
 
 }  // namespace tflite

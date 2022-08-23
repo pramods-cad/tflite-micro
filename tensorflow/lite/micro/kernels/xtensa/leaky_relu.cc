@@ -99,7 +99,7 @@ TfLiteStatus LeakyReluEval(TfLiteContext* context, TfLiteNode* node) {
     } break;
 #endif // defined(HIFI4) || defined(HIFI5)
     case kTfLiteInt16: {
-#if defined(HIFI4_INTERNAL)
+#if defined(HIFI4_INTERNAL) || defined(HIFI4) || defined(HIFI5)
       const RuntimeShape& input_shape = tflite::micro::GetTensorShape(input);
       const RuntimeShape& output_shape = tflite::micro::GetTensorShape(output);
       const int flat_size = MatchingFlatSize(input_shape, output_shape);
@@ -125,14 +125,8 @@ TfLiteStatus LeakyReluEval(TfLiteContext* context, TfLiteNode* node) {
 }
 
 TfLiteRegistration Register_LEAKY_RELU() {
-  return {/*init=*/LeakyReluInit,
-          /*free=*/nullptr,
-          /*prepare=*/LeakyReluPrepare,
-          /*invoke=*/LeakyReluEval,
-          /*profiling_string=*/nullptr,
-          /*builtin_code=*/0,
-          /*custom_name=*/nullptr,
-          /*version=*/0};
+  return tflite::micro::RegisterOp(LeakyReluInit, LeakyReluPrepare,
+                                   LeakyReluEval);
 }
 
 }  // namespace tflite

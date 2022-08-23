@@ -51,7 +51,7 @@ TfLiteStatus PreluEval(TfLiteContext* context, TfLiteNode* node) {
                                 tflite::micro::GetTensorData<float>(output));
       return kTfLiteOk;
     } break;
-#if defined(HIFI4) || defined(HIFI5)
+#if defined(HIFI5) || defined(HIFI4)
     case kTfLiteInt8: {
       const RuntimeShape& input_shape = tflite::micro::GetTensorShape(input);
       const RuntimeShape& alpha_shape = tflite::micro::GetTensorShape(alpha);
@@ -73,7 +73,7 @@ TfLiteStatus PreluEval(TfLiteContext* context, TfLiteNode* node) {
           params.output_offset,
 	  flat_size);
 
-	TF_LITE_ENSURE(context, err == 0);
+    TF_LITE_ENSURE(context, err == 0);
       }
       else
       {
@@ -98,7 +98,7 @@ TfLiteStatus PreluEval(TfLiteContext* context, TfLiteNode* node) {
           tflite::micro::GetTensorData<int8_t>(output));
       return kTfLiteOk;
     } break;
-#endif // defined(HIFI4) || defined(HIFI5)
+#endif // defined(HIFI5) || defined(HIFI4)
     default:
       TF_LITE_KERNEL_LOG(
           context, "Only float32 and uint8_t are supported currently, got %d.",
@@ -108,14 +108,7 @@ TfLiteStatus PreluEval(TfLiteContext* context, TfLiteNode* node) {
 }
 
 TfLiteRegistration Register_PRELU() {
-  return {/*init=*/PreluInit,
-          /*free=*/nullptr,
-          /*prepare=*/PreluPrepare,
-          /*invoke=*/PreluEval,
-          /*profiling_string=*/nullptr,
-          /*builtin_code=*/0,
-          /*custom_name=*/nullptr,
-          /*version=*/0};
+  return tflite::micro::RegisterOp(PreluInit, PreluPrepare, PreluEval);
 }
 
 }  // namespace tflite

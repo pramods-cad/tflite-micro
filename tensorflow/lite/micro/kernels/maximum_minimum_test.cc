@@ -187,9 +187,9 @@ TF_LITE_MICRO_TEST(Int8Test) {
 }
 
 /* currently disabled as it is passing with -O0 flag only.
- * failing with RI.6 tools and -O2/-O3 flags
- * tbd
- */
+ *  * failing with RI.6 tools and -O2/-O3 flags
+ *   * tbd
+ *    */
 #if !(XTENSA)
 TF_LITE_MICRO_TEST(FloatWithBroadcastTest) {
   int dims[] = {3, 3, 1, 2};
