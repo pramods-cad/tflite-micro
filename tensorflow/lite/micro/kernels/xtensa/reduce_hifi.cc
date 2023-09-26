@@ -116,14 +116,37 @@ TfLiteStatus PrepareMeanOrSumHifi(TfLiteContext* context, TfLiteNode* node,
 #if defined(HIFI5) || defined(HIFI4)
   XtensaReduceOpData* xt_data =
           reinterpret_cast<XtensaReduceOpData*>(node->user_data);
-  if((input->dims->size <= 4) && (input->type == kTfLiteInt8))
+  if((input->dims->size <= 4) && (input->type == kTfLiteInt8 || input->type == kTfLiteInt16))
   {
     reduce_ops_t reduce_type = REDUCE_MEAN;
     const TfLiteEvalTensor* eval_axis = tflite::micro::GetEvalInput(context, node, 1);
     const int *axis_data_ptr  = tflite::micro::GetTensorData<int>(eval_axis);
     int num_axis = static_cast<int>(ElementCount(*eval_axis->dims));
     int required_scratch;
-    required_scratch = xa_nn_reduce_getsize_nhwc(-4,
+    const TfLiteEvalTensor* eval_input = tflite::micro::GetEvalInput(context, node, 0);
+    int resolved_axis[kMaxNumberOfReducedAxisHifi];
+    int num_resolved_axis = 0;
+    if (!reference_ops::ResolveAxis(eval_input->dims->size, tflite::micro::GetTensorData<int>(eval_axis), num_axis, resolved_axis, &num_resolved_axis)) {
+      TF_LITE_ENSURE(context, false);
+    }
+    int num_elm_in_axis = 1;
+    int axis_itr;
+    
+    for(axis_itr=0; axis_itr < num_resolved_axis; axis_itr++)
+    {
+      num_elm_in_axis *= eval_input->dims->data[resolved_axis[axis_itr]];
+    }
+
+    int shift = 63 - CountLeadingZeros(static_cast<uint64_t>(num_elm_in_axis));
+    shift = std::min(std::min(shift, 32), 31 + op_data->shift);
+    xt_data->updated_multiplier = (num_elm_in_axis > 1) ? (WORD32)(((long long int)(op_data->multiplier) << shift) / num_elm_in_axis) : op_data->multiplier;
+    xt_data->updated_shift = op_data->shift - shift;
+    
+    int inp_precision = -4; /* ASYM8S */ 
+    if(input->type == kTfLiteInt16)
+     inp_precision = -7; /* ASYM16S */ 
+    
+    required_scratch = xa_nn_reduce_getsize_nhwc(inp_precision,
                                                 input->dims->data,
                                                 input->dims->size,
                                                 axis_data_ptr,
@@ -139,6 +162,10 @@ TfLiteStatus PrepareMeanOrSumHifi(TfLiteContext* context, TfLiteNode* node,
         context, required_scratch,
         &(xt_data->scratch_tensor_index));
     TF_LITE_ENSURE_OK(context, scratch_status);
+    micro_context->DeallocateTempTfLiteTensor(input);
+    micro_context->DeallocateTempTfLiteTensor(output);
+    micro_context->DeallocateTempTfLiteTensor(axis);
+    return kTfLiteOk;
   }
 #endif
   TF_LITE_ENSURE_OK(
@@ -284,8 +311,8 @@ TfLiteStatus EvalMeanHifi(TfLiteContext* context, TfLiteNode* node,
                                                  input->dims->size,
                                                  num_resolved_axis,
                                                  op_data->input_zp,
-                                                 op_data->multiplier,
-                                                 op_data->shift,
+                                                 xt_data->updated_multiplier,
+                                                 xt_data->updated_shift,
                                                  op_data->output_zp,
                                                  p_scratch);
         TF_LITE_ENSURE(context, err == 0);
@@ -303,9 +330,50 @@ TfLiteStatus EvalMeanHifi(TfLiteContext* context, TfLiteNode* node,
 #endif
     } break;
     case kTfLiteInt16: {
+#if defined(HIFI5) || defined(HIFI4)
+      XtensaReduceOpData* xt_data =
+              reinterpret_cast<XtensaReduceOpData*>(node->user_data);
+      const int16_t *input_data_ptr  = tflite::micro::GetTensorData<int16_t>(input);
+      int16_t *output_data_ptr  = tflite::micro::GetTensorData<int16_t>(output);
+      void *p_scratch;
+      int err = 0;
+
+      if(input->dims->size <= 4)
+      {
+        // Resolve axis.
+        int num_resolved_axis = 0;
+        if (!reference_ops::ResolveAxis(input->dims->size, tflite::micro::GetTensorData<int>(axis), num_axis, resolved_axis, &num_resolved_axis)) {
+          TF_LITE_ENSURE(context, false);
+        }
+        p_scratch = static_cast<void*>(
+        context->GetScratchBuffer(context, xt_data->scratch_tensor_index));
+
+        err = xa_nn_reduce_mean_4D_asym16s_asym16s(output_data_ptr,
+                                                 output->dims->data,
+                                                 input_data_ptr,
+                                                 input->dims->data,
+                                                 resolved_axis,
+                                                 output->dims->size,
+                                                 input->dims->size,
+                                                 num_resolved_axis,
+                                                 op_data->input_zp,
+                                                 xt_data->updated_multiplier,
+                                                 xt_data->updated_shift,
+                                                 op_data->output_zp,
+                                                 p_scratch);
+        TF_LITE_ENSURE(context, err == 0);
+      }
+      else
+      {
+        TF_LITE_ENSURE_OK(
+            context, EvalIntegerMean<int16_t>(context, node, num_axis, op_data,
+                                             temp_index, resolved_axis));
+      }
+#else
       TF_LITE_ENSURE_OK(
           context, EvalIntegerMean<int16_t>(context, node, num_axis, op_data,
                                             temp_index, resolved_axis));
+#endif
     } break;
     default:
       TF_LITE_ENSURE_MSG(context, false,

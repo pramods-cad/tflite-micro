@@ -68,7 +68,8 @@ TfLiteStatus XtensaCalculateOpDataFullyConnected(
     // int8 quantization. See
     // https://github.com/tensorflow/tensorflow/issues/44912 for additional
     // context.
-    TFLITE_DCHECK(filter->params.zero_point == 0);
+    // Disabling filter ZP check to allow activations * activations FC in Transformer networks.
+    //TFLITE_DCHECK(filter->params.zero_point == 0);
 
     data->input_zero_point = input->params.zero_point;
     data->filter_zero_point = filter->params.zero_point;
@@ -106,12 +107,24 @@ TfLiteStatus XtensaPrepareFullyConnected(TfLiteContext* context,
   TF_LITE_ENSURE_TYPES_EQ(context, input->type, output->type);
 
   if (filter->type == kTfLiteInt4) {
+#if defined(HIFI5) && defined(NNLIB_HIFI5)
+  const TfLiteEvalTensor* filter_eval =
+      tflite::micro::GetEvalInput(context, node, kFullyConnectedWeightsTensor);
+  const RuntimeShape& filter_shape = tflite::micro::GetTensorShape(filter_eval);
+  const int filter_dim_count = filter_shape.DimensionsCount();
+  const int accum_depth = filter_shape.Dims(filter_dim_count - 1);
+  const int align_width = 16; 
+  int filter_size = align_width + accum_depth;
+  context->RequestScratchBufferInArena(context, filter_size,
+                                         &data->filter_buffer_index);
+#else    
     int filter_size =
         RuntimeShape(filter->dims->size,
                      reinterpret_cast<const int32_t*>(filter->dims->data))
             .FlatSize();
     context->RequestScratchBufferInArena(context, filter_size,
                                          &data->filter_buffer_index);
+#endif                                         
   }
 
   TFLITE_DCHECK_GE(GetTensorShape(output).DimensionsCount(), 1);
