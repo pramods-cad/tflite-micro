@@ -88,7 +88,7 @@ TfLiteStatus DepthwiseConvPrepareHifi(TfLiteContext* context,
             output_height, output_width, PREC_SYM16S, 0 /* NHWC */);
         TF_LITE_ENSURE(context, required_scratch > 0);            
         }
-#if HIFI_VFPU
+#if defined(INCLUDE_FLOAT_OPT)
         else if(input->type == kTfLiteFloat32){
         required_scratch = xa_nn_conv2d_depthwise_getsize(
             input_height, input_width, input_depth, filter_height, filter_width,
@@ -108,7 +108,7 @@ TfLiteStatus DepthwiseConvPrepareHifi(TfLiteContext* context,
       output_height, output_width, PREC_ASYM8S, 0 /* NHWC */);
       TF_LITE_ENSURE(context, required_scratch > 0);        
     }  
-#if HIFI_VFPU
+#if defined(INCLUDE_FLOAT_OPT)
         else if(input->type == kTfLiteFloat32){
             required_scratch = xa_nn_dilated_conv2d_depthwise_getsize(
             input_height, input_width, input_depth, filter_height, filter_width,
@@ -380,7 +380,7 @@ TfLiteStatus DepthwiseConvEvalInt16Hifi(TfLiteContext* context, TfLiteNode* node
   }
 }
 
-#if HIFI_VFPU
+#if defined(INCLUDE_FLOAT_OPT)
 TfLiteStatus DepthwiseConvEvalFloat32Hifi(TfLiteContext* context, TfLiteNode* node,
                                    const TfLiteDepthwiseConvParams& params,
                                    const XtensaDepthwiseConvOpData& data,
