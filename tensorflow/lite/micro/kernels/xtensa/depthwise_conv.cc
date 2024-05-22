@@ -53,12 +53,6 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
       micro_context->AllocateTempInputTensor(node, kConvInputTensor);
   TF_LITE_ENSURE(context, input != nullptr);
 
-  // For int16 input, only fallback to the reference kernel is used
-  // so there is no need to prepare the Hifi/Vision kernel.
-  if (input->type == kTfLiteInt16) {
-    micro_context->DeallocateTempTfLiteTensor(input);
-    return kTfLiteOk;
-  }
   micro_context->DeallocateTempTfLiteTensor(input);
 
 #if defined(HIFI3) || defined(HIFI4) || defined(HIFI5)
@@ -100,8 +94,8 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
       switch (filter_int8.type) {
         case kTfLiteInt8: {
 #if defined(HIFI3) || defined(HIFI4) || defined(HIFI5)
-          DepthwiseConvEvalHifi(context, node, params, op_data, input,
-                                &filter_int8, bias, output);
+          DepthwiseConvEvalInt8Hifi(context, node, params, op_data, input,
+                                    &filter_int8, bias, output);
 #elif defined(VISION_P6)
           DepthwiseConvEvalVision(context, node, params, op_data, input,
                                   &filter_int8, bias, output);

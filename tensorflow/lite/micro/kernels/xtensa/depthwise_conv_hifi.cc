@@ -50,8 +50,6 @@ TfLiteStatus DepthwiseConvPrepareHifi(TfLiteContext* context,
       micro_context->AllocateTempInputTensor(node, kConvWeightsTensor);
   TF_LITE_ENSURE(context, filter != nullptr);
 
-  TF_LITE_ENSURE_EQ(context, input->type, kTfLiteInt8);
-
   const RuntimeShape& input_shape = GetTensorShape(input);
   const RuntimeShape& filter_shape = GetTensorShape(filter);
   const RuntimeShape& output_shape = GetTensorShape(output);
@@ -109,13 +107,13 @@ TfLiteStatus DepthwiseConvPrepareHifi(TfLiteContext* context,
       TF_LITE_ENSURE(context, required_scratch > 0);        
     }  
 #if defined(INCLUDE_FLOAT_OPT)
-        else if(input->type == kTfLiteFloat32){
-            required_scratch = xa_nn_dilated_conv2d_depthwise_getsize(
-            input_height, input_width, input_depth, filter_height, filter_width,
-            depth_multiplier, dilation_height, dilation_width, stride_width, stride_height, pad_width, pad_height,
-            output_height, output_width, PREC_F32, 0 /* NHWC */);
-            TF_LITE_ENSURE(context, required_scratch > 0);           
-        }
+    else if(input->type == kTfLiteFloat32){
+      required_scratch = xa_nn_dilated_conv2d_depthwise_getsize(
+      input_height, input_width, input_depth, filter_height, filter_width,
+      depth_multiplier, dilation_height, dilation_width, stride_width, stride_height, pad_width, pad_height,
+      output_height, output_width, PREC_F32, 0 /* NHWC */);
+      TF_LITE_ENSURE(context, required_scratch > 0);           
+    }
 #endif         
   }
   TF_LITE_ENSURE_OK(
@@ -128,7 +126,7 @@ TfLiteStatus DepthwiseConvPrepareHifi(TfLiteContext* context,
   return kTfLiteOk;
 }
 
-TfLiteStatus DepthwiseConvEvalHifi(TfLiteContext* context, TfLiteNode* node,
+TfLiteStatus DepthwiseConvEvalInt8Hifi(TfLiteContext* context, TfLiteNode* node,
                                    const TfLiteDepthwiseConvParams& params,
                                    const XtensaDepthwiseConvOpData& data,
                                    const TfLiteEvalTensor* input,
